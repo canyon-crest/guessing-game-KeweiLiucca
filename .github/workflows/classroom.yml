@@ -1,0 +1,632 @@
+name: Guessing Game Autograding
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  autograde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install test deps
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --save-dev jest@29 jsdom@21 jest-environment-jsdom@29
+
+      - name: Write jest setup
+        run: |
+          cat > jest.setup.cjs <<'EOF'
+          const { TextEncoder, TextDecoder } = require('util');
+          if (typeof global.TextEncoder === 'undefined') global.TextEncoder = TextEncoder;
+          if (typeof global.TextDecoder === 'undefined') global.TextDecoder = TextDecoder;
+          EOF
+
+      - name: Write jest config
+        run: |
+          cat > jest.config.cjs <<'EOF'
+          module.exports = {
+            testEnvironment: 'jsdom',
+            setupFiles: ['<rootDir>/jest.setup.cjs'],
+            testMatch: ['**/__tests__/**/*.test.cjs'],
+            testTimeout: 30000
+          };
+          EOF
+
+      - name: Write tests
+        run: |
+          mkdir -p __tests__
+          cat > __tests__/guessing-game.test.cjs <<'TESTEOF'
+          const fs = require('fs');
+          const path = require('path');
+          const { JSDOM, VirtualConsole } = require('jsdom');
+
+          const wait = (ms = 50) => new Promise(r => setTimeout(r, ms));
+          const findFile = arr => arr.find(p => fs.existsSync(p)) || null;
+          const findIndex = () => findFile([
+            'index.html', 'public/index.html', 'src/index.html', 'docs/index.html'
+          ]);
+
+          function byId(doc, id) { return doc.getElementById(id); }
+
+          function text(doc, id) {
+            const el = byId(doc, id);
+            return (el && (el.textContent || el.innerText) || '').trim();
+          }
+
+          function setVal(doc, id, v) {
+            const el = byId(doc, id);
+            if (!el) return false;
+            el.value = String(v);
+            return true;
+          }
+
+          function click(doc, id) {
+            const el = byId(doc, id);
+            if (el) el.click();
+          }
+
+          function selectLevel(doc, levelId) {
+            ['e', 'm', 'h'].forEach(function (id) {
+              var radio = byId(doc, id);
+              if (radio) radio.checked = (id === levelId);
+            });
+          }
+
+          function setAnswer(win, answer, range) {
+            win.Math.random = function () { return (answer - 0.5) / range; };
+          }
+
+          async function loadDOM() {
+            const idx = findIndex();
+            if (!idx) throw new Error('index.html not found (root/public/src/docs).');
+
+            const vconsole = new VirtualConsole();
+            vconsole.on('error', function () { });
+
+            const baseDir = path.dirname(path.resolve(idx));
+            const baseUrl = 'file://' + baseDir.replace(/\\+/g, '/') + '/';
+
+            const dom = await JSDOM.fromFile(idx, {
+              url: baseUrl,
+              runScripts: 'dangerously',
+              resources: 'usable',
+              pretendToBeVisual: true,
+              virtualConsole: vconsole
+            });
+
+            dom.window.prompt = function () { return 'jOhN'; };
+            dom.window.alert = function () { };
+
+            await new Promise(function (res) {
+              dom.window.addEventListener('load', res, { once: true });
+            });
+            await wait();
+            return dom;
+          }
+
+          async function winRound(dom, levelId, answer, wrongGuesses) {
+            var doc = dom.window.document;
+            var range = parseInt(byId(doc, levelId).value);
+            selectLevel(doc, levelId);
+            setAnswer(dom.window, answer, range);
+            click(doc, 'playBtn');
+            await wait(30);
+            for (var i = 0; i < wrongGuesses.length; i++) {
+              setVal(doc, 'guess', String(wrongGuesses[i]));
+              click(doc, 'guessBtn');
+              await wait(30);
+            }
+            setVal(doc, 'guess', String(answer));
+            click(doc, 'guessBtn');
+            await wait(30);
+          }
+
+          /* ── Structure & Date ── */
+          describe('Guessing Game – Structure', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('required elements exist', function () {
+              var ids = ['date', 'playBtn', 'guessBtn', 'giveUpBtn', 'msg', 'guess',
+                'wins', 'avgScore', 'fastest', 'avgTime'];
+              ids.forEach(function (id) {
+                expect(byId(document, id)).not.toBeNull();
+              });
+              var radios = document.getElementsByName('level');
+              expect(radios.length).toBeGreaterThanOrEqual(3);
+              var values = [];
+              for (var i = 0; i < radios.length; i++) {
+                values.push(parseInt(radios[i].value));
+              }
+              expect(values).toContain(3);
+              expect(values).toContain(10);
+              expect(values).toContain(100);
+              var leaderboard = document.getElementsByName('leaderboard');
+              expect(leaderboard.length).toBeGreaterThanOrEqual(3);
+            });
+
+            test('buttons use addEventListener not onclick', function () {
+              ['playBtn', 'guessBtn', 'giveUpBtn'].forEach(function (id) {
+                var btn = byId(document, id);
+                expect(btn).not.toBeNull();
+                expect(btn.getAttribute('onclick')).toBeNull();
+              });
+            });
+
+            test('date with month names and suffixes', function () {
+              var dateText = text(document, 'date');
+              expect(dateText.length).toBeGreaterThan(0);
+              var monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+              var hasMonth = monthNames.some(function (m) { return dateText.indexOf(m) !== -1; });
+              expect(hasMonth).toBe(true);
+              expect(dateText).toMatch(/\d+(st|nd|rd|th)/);
+              var now = new Date();
+              expect(dateText).toMatch(new RegExp(String(now.getFullYear())));
+            });
+          });
+
+          /* ── Play ── */
+          describe('Guessing Game – Play', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('play starts a round', async function () {
+              var msgBefore = text(document, 'msg');
+              selectLevel(document, 'e');
+              setAnswer(window, 2, 3);
+              click(document, 'playBtn');
+              await wait();
+              expect(text(document, 'msg')).not.toBe(msgBefore);
+              expect(byId(document, 'guessBtn').disabled).toBe(false);
+              expect(byId(document, 'giveUpBtn').disabled).toBe(false);
+              expect(byId(document, 'playBtn').disabled).toBe(true);
+            });
+          });
+
+          /* ── Feedback ── */
+          describe('Guessing Game – Feedback', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('correct guess and high low feedback', async function () {
+              selectLevel(document, 'e');
+              setAnswer(window, 2, 3);
+              click(document, 'playBtn');
+              await wait();
+              setVal(document, 'guess', '3');
+              click(document, 'guessBtn');
+              await wait();
+              expect(text(document, 'msg').toLowerCase()).toMatch(/high/);
+              setVal(document, 'guess', '1');
+              click(document, 'guessBtn');
+              await wait();
+              expect(text(document, 'msg').toLowerCase()).toMatch(/low/);
+              setVal(document, 'guess', '2');
+              click(document, 'guessBtn');
+              await wait();
+              expect(text(document, 'msg').toLowerCase()).toMatch(/correct/);
+              expect(byId(document, 'guessBtn').disabled).toBe(true);
+            });
+          });
+
+          /* ── Proximity ── */
+          describe('Guessing Game – Proximity', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('hot warm cold proximity feedback', async function () {
+              selectLevel(document, 'h');
+              setAnswer(window, 50, 100);
+              click(document, 'playBtn');
+              await wait();
+              setVal(document, 'guess', '49');
+              click(document, 'guessBtn');
+              await wait();
+              expect(text(document, 'msg').toLowerCase()).toMatch(/hot/);
+              setVal(document, 'guess', '45');
+              click(document, 'guessBtn');
+              await wait();
+              expect(text(document, 'msg').toLowerCase()).toMatch(/warm/);
+              setVal(document, 'guess', '10');
+              click(document, 'guessBtn');
+              await wait();
+              expect(text(document, 'msg').toLowerCase()).toMatch(/cold/);
+            });
+          });
+
+          /* ── Name ── */
+          describe('Guessing Game – Name', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('player name used in messages', async function () {
+              selectLevel(document, 'e');
+              setAnswer(window, 2, 3);
+              click(document, 'playBtn');
+              await wait();
+              var playMsg = text(document, 'msg');
+              expect(playMsg).toMatch(/John/);
+              setVal(document, 'guess', '2');
+              click(document, 'guessBtn');
+              await wait();
+              expect(text(document, 'msg')).toMatch(/John/);
+            });
+          });
+
+          /* ── Wins & Average ── */
+          describe('Guessing Game – WinsAvg', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('wins counter and average score', async function () {
+              await winRound(dom, 'e', 2, []);
+              var winsText = text(document, 'wins');
+              expect(winsText).toMatch(/1/);
+              await winRound(dom, 'e', 2, [1, 3]);
+              winsText = text(document, 'wins');
+              expect(winsText).toMatch(/2/);
+              var avgText = text(document, 'avgScore');
+              var match = avgText.match(/[\d.]+/);
+              expect(match).not.toBeNull();
+              var avgNum = parseFloat(match[0]);
+              expect(avgNum).toBe(2);
+            });
+          });
+
+          /* ── Leaderboard ── */
+          describe('Guessing Game – Leaderboard', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('leaderboard sorted top 3', async function () {
+              await winRound(dom, 'e', 2, [1, 3]);
+              await winRound(dom, 'e', 2, []);
+              await winRound(dom, 'e', 2, [1, 3, 1, 3]);
+              await winRound(dom, 'e', 2, [1]);
+              var leaderboard = document.getElementsByName('leaderboard');
+              var values = [];
+              for (var i = 0; i < Math.min(3, leaderboard.length); i++) {
+                var val = parseInt(leaderboard[i].textContent);
+                if (!isNaN(val)) values.push(val);
+              }
+              expect(values.length).toBe(3);
+              expect(values[0]).toBe(1);
+              expect(values[1]).toBe(2);
+              expect(values[2]).toBe(3);
+            });
+          });
+
+          /* ── Give Up ── */
+          describe('Guessing Game – GiveUp', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('give up sets score to range', async function () {
+              selectLevel(document, 'm');
+              setAnswer(window, 5, 10);
+              click(document, 'playBtn');
+              await wait();
+              click(document, 'giveUpBtn');
+              await wait();
+              expect(byId(document, 'guessBtn').disabled).toBe(true);
+              expect(byId(document, 'playBtn').disabled).toBe(false);
+              var leaderboard = document.getElementsByName('leaderboard');
+              var found = false;
+              for (var i = 0; i < leaderboard.length; i++) {
+                if (parseInt(leaderboard[i].textContent) === 10) found = true;
+              }
+              expect(found).toBe(true);
+              var winsText = text(document, 'wins');
+              expect(winsText).toMatch(/1/);
+            });
+          });
+
+          /* ── Live Time ── */
+          describe('Guessing Game – LiveTime', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('live time updates every second', async function () {
+              var before = text(document, 'date');
+              await new Promise(function (r) { setTimeout(r, 2100); });
+              var after = text(document, 'date');
+              expect(after).not.toBe(before);
+            });
+          });
+
+          /* ── Timers ── */
+          describe('Guessing Game – Timers', function () {
+            var dom, window, document;
+            beforeAll(async function () {
+              dom = await loadDOM();
+              window = dom.window;
+              document = window.document;
+            });
+            afterAll(function () { if (dom) dom.window.close(); });
+
+            test('round timer fastest and average time', async function () {
+              await winRound(dom, 'e', 2, []);
+              var fastestText = text(document, 'fastest');
+              expect(fastestText).toMatch(/\d/);
+              await winRound(dom, 'e', 2, [1]);
+              var avgTimeText = text(document, 'avgTime');
+              expect(avgTimeText).toMatch(/\d/);
+            });
+          });
+          TESTEOF
+
+      # === Graded steps (12 tests, 90 points total) ===
+
+      - id: t_elements
+        name: required elements exist
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: required elements exist
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "required elements exist$"
+          timeout: 60
+          max-score: 5
+
+      - id: t_listeners
+        name: buttons use addEventListener
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: buttons use addEventListener
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "buttons use addEventListener not onclick$"
+          timeout: 60
+          max-score: 5
+
+      - id: t_play
+        name: play starts a round
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: play starts a round
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "play starts a round$"
+          timeout: 60
+          max-score: 10
+
+      - id: t_feedback
+        name: correct guess and high low feedback
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: correct guess and high low feedback
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "correct guess and high low feedback$"
+          timeout: 60
+          max-score: 15
+
+      - id: t_proximity
+        name: hot warm cold proximity feedback
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: hot warm cold proximity feedback
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "hot warm cold proximity feedback$"
+          timeout: 60
+          max-score: 5
+
+      - id: t_name
+        name: player name used in messages
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: player name used in messages
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "player name used in messages$"
+          timeout: 60
+          max-score: 5
+
+      - id: t_wins_avg
+        name: wins counter and average score
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: wins counter and average score
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "wins counter and average score$"
+          timeout: 60
+          max-score: 10
+
+      - id: t_leaderboard
+        name: leaderboard sorted top 3
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: leaderboard sorted top 3
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "leaderboard sorted top 3$"
+          timeout: 60
+          max-score: 10
+
+      - id: t_giveup
+        name: give up sets score to range
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: give up sets score to range
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "give up sets score to range$"
+          timeout: 60
+          max-score: 5
+
+      - id: t_date
+        name: date with month names and suffixes
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: date with month names and suffixes
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "date with month names and suffixes$"
+          timeout: 60
+          max-score: 10
+
+      - id: t_livetime
+        name: live time updates every second
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: live time updates every second
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "live time updates every second$"
+          timeout: 60
+          max-score: 5
+
+      - id: t_timers
+        name: round timer fastest and average time
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: round timer fastest and average time
+          setup-command: echo "ready"
+          command: npx jest --runInBand --testNamePattern "round timer fastest and average time$"
+          timeout: 60
+          max-score: 5
+
+      # === Prepare reporter env ===
+      - name: Prepare reporter env
+        id: prepEnv
+        shell: bash
+        run: |
+          echo "T_ELEMENTS_RESULTS=${{ steps.t_elements.outputs.result }}"         >> "$GITHUB_ENV"
+          echo "T_LISTENERS_RESULTS=${{ steps.t_listeners.outputs.result }}"       >> "$GITHUB_ENV"
+          echo "T_PLAY_RESULTS=${{ steps.t_play.outputs.result }}"                 >> "$GITHUB_ENV"
+          echo "T_FEEDBACK_RESULTS=${{ steps.t_feedback.outputs.result }}"         >> "$GITHUB_ENV"
+          echo "T_PROXIMITY_RESULTS=${{ steps.t_proximity.outputs.result }}"       >> "$GITHUB_ENV"
+          echo "T_NAME_RESULTS=${{ steps.t_name.outputs.result }}"                 >> "$GITHUB_ENV"
+          echo "T_WINS_AVG_RESULTS=${{ steps.t_wins_avg.outputs.result }}"         >> "$GITHUB_ENV"
+          echo "T_LEADERBOARD_RESULTS=${{ steps.t_leaderboard.outputs.result }}"   >> "$GITHUB_ENV"
+          echo "T_GIVEUP_RESULTS=${{ steps.t_giveup.outputs.result }}"             >> "$GITHUB_ENV"
+          echo "T_DATE_RESULTS=${{ steps.t_date.outputs.result }}"                 >> "$GITHUB_ENV"
+          echo "T_LIVETIME_RESULTS=${{ steps.t_livetime.outputs.result }}"         >> "$GITHUB_ENV"
+          echo "T_TIMERS_RESULTS=${{ steps.t_timers.outputs.result }}"             >> "$GITHUB_ENV"
+
+      # === Combined summary ===
+      - name: Build & publish combined summary
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+
+          const tests = [
+            { key: 'ELEMENTS',    label: 'required elements exist',               weight: 5  },
+            { key: 'LISTENERS',   label: 'buttons use addEventListener',           weight: 5  },
+            { key: 'PLAY',        label: 'play starts a round',                    weight: 10 },
+            { key: 'FEEDBACK',    label: 'correct guess and high/low feedback',    weight: 15 },
+            { key: 'PROXIMITY',   label: 'hot/warm/cold proximity feedback',       weight: 5  },
+            { key: 'NAME',        label: 'player name used in messages',           weight: 5  },
+            { key: 'WINS_AVG',    label: 'wins counter and average score',         weight: 10 },
+            { key: 'LEADERBOARD', label: 'leaderboard sorted top 3',              weight: 10 },
+            { key: 'GIVEUP',      label: 'give up sets score to range',            weight: 5  },
+            { key: 'DATE',        label: 'date with month names and suffixes',     weight: 10 },
+            { key: 'LIVETIME',    label: 'live time updates every second',         weight: 5  },
+            { key: 'TIMERS',      label: 'round timer, fastest, and avg time',     weight: 5  },
+          ];
+
+          let total = 0;
+          let earned = 0;
+          const lines = ["# Guessing Game Autograder Summary", ""];
+
+          for (const t of tests) {
+            total += t.weight;
+            const envName = `T_${t.key}_RESULTS`;
+            const raw = process.env[envName] || "";
+            let passed = false;
+
+            try {
+              let decoded;
+              try {
+                decoded = Buffer.from(raw, 'base64').toString('utf8');
+              } catch {
+                decoded = raw;
+              }
+
+              const obj = JSON.parse(decoded);
+              const status = (obj.status || "").toString().toLowerCase();
+
+              if (status === 'pass' || status === 'passed') {
+                passed = true;
+              } else if (Array.isArray(obj.tests)) {
+                passed = obj.tests.some(
+                  (test) =>
+                    (test.status || "").toString().toLowerCase() === 'pass' ||
+                    (test.status || "").toString().toLowerCase() === 'passed'
+                );
+              }
+            } catch (e) {}
+
+            if (passed) {
+              earned += t.weight;
+              lines.push(`✅ ${t.label} (${t.weight} pts)`);
+            } else {
+              lines.push(`❌ ${t.label} (${t.weight} pts)`);
+            }
+          }
+
+          lines.push("");
+          lines.push(`**Autograded Score: ${earned}/${total}**`);
+          lines.push("");
+          lines.push("*Above and Beyond (up to 10 pts) is graded separately by your teacher.*");
+
+          const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+          if (summaryPath) {
+            fs.appendFileSync(summaryPath, lines.join("\n") + "\n");
+          } else {
+            console.log(lines.join("\n"));
+          }
+          NODE
+
+      # === Report to Classroom ===
+      - name: Report grades
+        uses: classroom-resources/autograding-grading-reporter@v1
+        with:
+          runners: 't_elements,t_listeners,t_play,t_feedback,t_proximity,t_name,t_wins_avg,t_leaderboard,t_giveup,t_date,t_livetime,t_timers'
+          token: ${{ github.token }}
