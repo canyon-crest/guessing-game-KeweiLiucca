@@ -7,6 +7,7 @@ let capitalized = playerName.charAt(0).toUpperCase()+ playerName.slice(1).toLowe
 
 document.getElementById("playBtn").addEventListener("click",play);
 document.getElementById("guessBtn").addEventListener("click", makeGuess);
+document.getElementById("giveUpBtn").addEventListener("click", giveUp);
 
 let range = 0;
 let levels = document.getElementsByName("level");
@@ -92,5 +93,17 @@ function hwc(number){
     else{
         return"You are cold"
     }
+}
 
+function giveUp(){
+    let maxRange = 0;
+    let levels = document.getElementsByName("level");
+    for(let i=0; i<levels.length; i++){
+        if(levels[i].checked){
+            maxRange = parseInt(levels[i].value)
+        }
+    }
+    msg.textContent = capitalized+ " gave up 0.o Your score is " + maxRange;
+    updateScore(maxRange);
+    resetGame();
 }
