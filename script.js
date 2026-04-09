@@ -43,10 +43,12 @@ function makeGuess(){
         resetGame();
     }
     else if (guess < answer){
-        msg.textContent="Too low, try again."
+        msg.textContent="Too low, try again.";
+        hwc (guess);
     }
     else{
-        msg.textContent = "Too high, try again."
+        msg.textContent = "Too high, try again.";
+        hwc (guess);
     }
 }
 
@@ -77,4 +79,18 @@ function resetGame(){
     e.disabled = false;
     m.disabled = false;
     h.disabled = false;
+}
+
+function hwc(number){
+    let difference = Math.abs(number-answer);
+    if (difference<=2){
+        near.textContent = "You are hot"
+    }
+    else if (difference<=5){
+        near.textContent = "You are warm"
+    }
+    else{
+        near.textContent = "You are cold"
+    }
+
 }
