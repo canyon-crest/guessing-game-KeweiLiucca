@@ -24,7 +24,7 @@ function play (){
         }
         levels[i].disabled = true;
     }
-    document.getElementById("msg").textContent = "Guess a number 1-" + range;
+    document.getElementById("msg").textContent = capitalized + ", guess a number 1-" + range;
     answer = Math.floor(Math.random()*range)+1;
     guessCount = 0;
 
@@ -41,15 +41,15 @@ function makeGuess(){
     }
     guessCount++;
     if(guess === answer){
-        msg.textContent= "Good job " + capitalized + ", You are correct! It took" + guessCount + " tries.";
+        msg.textContent= "Good job " + capitalized + ", you are correct! It took " + guessCount + " tries.";
         updateScore(guessCount);
         resetGame();
     }
     else if (guess < answer){
-        msg.textContent="Too low, try again." + hwc (guess);
+        msg.textContent="No " + capitalized+ "Too low, try again." + hwc (guess);
     }
     else{
-        msg.textContent = "Too high, try again." +hwc (guess);
+        msg.textContent = "No " + capitalized+ "Too high, try again." +hwc (guess);
     }
 }
 
