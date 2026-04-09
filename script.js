@@ -5,9 +5,25 @@ const scores = [];
 let playerName = prompt("Enter your name:")
 let capitalized = playerName.charAt(0).toUpperCase()+ playerName.slice(1).toLowerCase();
 
+const monthName = new Date().toLocaleString('default', { month: 'long' });
+const day = new Date().getDate();
+const pr = new Intl.PluralRules('en-US', { type: 'ordinal' });
+const suffixes = {
+  one: 'st',
+  two: 'nd',
+  few: 'rd',
+  other: 'th',
+};
+const date = day + suffixes[pr.select(day)];
+const currentYear = new Date().getFullYear();
+
+let displayDate = monthName + " " + date + ", " + currentYear;
+
+document.getElementById("date").textContent = displayDate
 document.getElementById("playBtn").addEventListener("click",play);
 document.getElementById("guessBtn").addEventListener("click", makeGuess);
 document.getElementById("giveUpBtn").addEventListener("click", giveUp);
+
 
 let range = 0;
 let levels = document.getElementsByName("level");
