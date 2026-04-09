@@ -2,6 +2,8 @@
 let answer = 0;
 let guessCount = 0;
 const scores = [];
+let playerName = prompt("Enter your name:")
+let capitalized = playerName.charAt(0).toUpperCase()+ playerName.slice(1).toLowerCase();
 
 document.getElementById("playBtn").addEventListener("click",play);
 document.getElementById("guessBtn").addEventListener("click", makeGuess);
@@ -38,17 +40,15 @@ function makeGuess(){
     }
     guessCount++;
     if(guess === answer){
-        msg.textContent= "Correct! It took" + guessCount + " tries.";
+        msg.textContent= "Good job " + capitalized + ", You are correct! It took" + guessCount + " tries.";
         updateScore(guessCount);
         resetGame();
     }
     else if (guess < answer){
-        msg.textContent="Too low, try again.";
-        hwc (guess);
+        msg.textContent="Too low, try again." + hwc (guess);
     }
     else{
-        msg.textContent = "Too high, try again.";
-        hwc (guess);
+        msg.textContent = "Too high, try again." +hwc (guess);
     }
 }
 
@@ -84,13 +84,13 @@ function resetGame(){
 function hwc(number){
     let difference = Math.abs(number-answer);
     if (difference<=2){
-        near.textContent = "You are hot"
+        return "You are hot"
     }
     else if (difference<=5){
-        near.textContent = "You are warm"
+        return "You are warm"
     }
     else{
-        near.textContent = "You are cold"
+        return"You are cold"
     }
 
 }
