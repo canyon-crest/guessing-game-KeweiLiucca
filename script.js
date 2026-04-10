@@ -66,13 +66,29 @@ function makeGuess() {
         return;
     }
     guessCount++;
+
     if (guess === answer) {
-        msg.textContent = "Good job " + capitalized + ", you are correct! It took " + guessCount + " tries.";
+        let feedback ="";
+        if (guessCount<=2){
+            feedback = "very Impressive";
+        }
+        else if(guessCount<=9){
+            feedback ="good job";
+        }
+        else if(guessCount<=15){
+            feedback = "maybe try better next time '-'";
+        }
+        else{
+            feedback="to be honest, that is bad";
+        }
+        msg.textContent = "Congradulations " + capitalized + ", you are correct! It took " + guessCount + " tries, "+feedback;
         updateScore(guessCount);
         roundEndTime = new Date().getTime();
         let roundDuration = (roundEndTime - roundStartTime) / 1000;
         updateTime(roundDuration);
+        celebrate();
         resetGame();
+        
     } else if (guess < answer) {
         msg.textContent = "No " + capitalized + " Too low, try again. " + hwc(guess);
     } else {
@@ -151,4 +167,32 @@ function updateTime(time){
    
     avgTime.textContent = "Average Time: " + (sum / times.length).toFixed(1);
     fastest.textContent = "Fastest Game: " + fastestTime.toFixed(1);
+}
+function celebrate() {
+    // Simple confetti using div elements (no external library needed)
+    const colors = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#FFEB3B'];
+    
+    for (let i = 0; i < 100; i++) {
+        const confetti = document.createElement('div');
+        confetti.style.position = 'fixed';
+        confetti.style.width = Math.random() * 8 + 4 + 'px';
+        confetti.style.height = Math.random() * 8 + 4 + 'px';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.left = Math.random() * window.innerWidth + 'px';
+        confetti.style.top = '-10px';
+        confetti.style.borderRadius = '50%';
+        confetti.style.pointerEvents = 'none';
+        confetti.style.zIndex = '9999';
+        document.body.appendChild(confetti);
+        
+        const animation = confetti.animate([
+            { transform: 'translateY(0px) rotate(0deg)', opacity: 1 },
+            { transform: `translateY(${window.innerHeight + 20}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+        ], {
+            duration: Math.random() * 2000 + 1000,
+            easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+        });
+        
+        animation.onfinish = () => confetti.remove();
+    }
 }
