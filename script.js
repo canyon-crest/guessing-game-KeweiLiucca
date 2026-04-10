@@ -24,37 +24,6 @@ const date = day + suffixes[pr.select(day)];
 const currentYear = new Date().getFullYear();
 const dateString = monthName + " " + date + ", " + currentYear;
 
-const themeToggle = document.getElementById('themeToggle');
-const body = document.body;
-
-// Check for saved theme preference in localStorage
-const savedTheme = localStorage.getItem('theme');
-if (savedTheme === 'dark') {
-    body.classList.add('dark-mode');
-    themeToggle.checked = true;
-} else if (savedTheme === 'light') {
-    body.classList.remove('dark-mode');
-    themeToggle.checked = false;
-} else {
-    // Check system preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (prefersDark) {
-        body.classList.add('dark-mode');
-        themeToggle.checked = true;
-    }
-}
-
-// Toggle theme when switch is clicked
-themeToggle.addEventListener('change', function() {
-    if (this.checked) {
-        body.classList.add('dark-mode');
-        localStorage.setItem('theme', 'dark');
-    } else {
-        body.classList.remove('dark-mode');
-        localStorage.setItem('theme', 'light');
-    }
-});
-
 function updateDateTimeDisplay() {
     const now = new Date();
     const timeString = now.toLocaleTimeString();
@@ -180,7 +149,6 @@ function updateTime(time){
         }
     }
    
-    avgTime.textContent = "Average Time: " + (sum / times.length).toFixed(1) + " seconds";
-    fastest.textContent = "Fastest Game: " + fastestTime.toFixed(1)+ " seconds";
-
+    avgTime.textContent = "Average Time: " + (sum / times.length).toFixed(1);
+    fastest.textContent = "Fastest Game: " + fastestTime.toFixed(1);
 }
