@@ -7,6 +7,7 @@ let roundEndTime = null;
 let fastestTime = null; // Fastest round time in seconds
 const scores = [];
 
+let feedback = "";
 let playerName = prompt("Enter your name:");
 let capitalized = playerName.charAt(0).toUpperCase() + playerName.slice(1).toLowerCase();
 
@@ -67,7 +68,19 @@ function makeGuess() {
     }
     guessCount++;
     if (guess === answer) {
-        msg.textContent = "Good job " + capitalized + ", you are correct! It took " + guessCount + " tries.";
+        if (guessCount<=2){
+            feedback = "very Impressive";
+        }
+        else if(guessCount<=9){
+            feedback ="good job";
+        }
+        else if(guessCount<=15){
+            feedback = "maybe try better next time '-'";
+        }
+        else{
+            feedback="to be honest, that is bad";
+        }
+        msg.textContent = "Good job " + capitalized + ", you are correct! It took " + guessCount + " tries, "+feedback;
         updateScore(guessCount);
         roundEndTime = new Date().getTime();
         let roundDuration = (roundEndTime - roundStartTime) / 1000;
