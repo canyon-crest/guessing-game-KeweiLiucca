@@ -1,7 +1,12 @@
 // add javascript here
 let answer = 0;
 let guessCount = 0;
+const times = []; // Array to store round times in seconds
+let roundStartTime = null; // Timestamp when current round starts
+let roundEndTime = null;
+let fastestTime = null; // Fastest round time in seconds
 const scores = [];
+
 let playerName = prompt("Enter your name:");
 let capitalized = playerName.charAt(0).toUpperCase() + playerName.slice(1).toLowerCase();
 
@@ -19,16 +24,14 @@ const date = day + suffixes[pr.select(day)];
 const currentYear = new Date().getFullYear();
 const dateString = monthName + " " + date + ", " + currentYear;
 
-// Function to update the display with date and current time
 function updateDateTimeDisplay() {
     const now = new Date();
     const timeString = now.toLocaleTimeString();
     document.getElementById("date").textContent = dateString + " - " + timeString;
 }
 
-// Update the time every second
+
 setInterval(updateDateTimeDisplay, 1000);
-// Initial call to set the time immediately
 updateDateTimeDisplay();
 // --- End Date and Time Logic ---
 
@@ -49,6 +52,8 @@ function play() {
     answer = Math.floor(Math.random() * range) + 1;
     guessCount = 0;
 
+    roundStartTime = new Date().getTime();
+
     guessBtn.disabled = false;
     giveUpBtn.disabled = false;
     playBtn.disabled = true;
@@ -64,6 +69,9 @@ function makeGuess() {
     if (guess === answer) {
         msg.textContent = "Good job " + capitalized + ", you are correct! It took " + guessCount + " tries.";
         updateScore(guessCount);
+        roundEndTime = new Date().getTime();
+        let roundDuration = (roundEndTime - roundStartTime) / 1000;
+        updateTime(roundDuration);
         resetGame();
     } else if (guess < answer) {
         msg.textContent = "No " + capitalized + " Too low, try again. " + hwc(guess);
@@ -122,5 +130,26 @@ function giveUp() {
     }
     msg.textContent = capitalized + " gave up 0.o Your score is " + maxRange;
     updateScore(maxRange);
+    roundEndTime = new Date().getTime();
+    let roundDuration = (roundEndTime - roundStartTime) / 1000;
+    updateTime(roundDuration);
     resetGame();
+}
+
+function updateTime(time){
+    times.push(time);
+    let sum = 0;
+    for (let i = 0; i < times.length; i++) {
+        sum += times[i];
+        }
+    let fastestTime = times[0];
+    for (let i = 1; i < times.length; i++) {
+        if (times[i] < fastestTime) {
+        fastestTime = times[i];
+        }
+    }
+   
+    avgTime.textContent = "Average Time: " + (sum / times.length).toFixed(1);
+    fastest.textContent = "Fastest Game: " + fastestTime.toFixed(1);
+
 }
