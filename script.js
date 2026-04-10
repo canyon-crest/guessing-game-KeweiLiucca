@@ -69,7 +69,7 @@ function makeGuess() {
     guessCount++;
     if (guess === answer) {
         if (guessCount<=2){
-            feedback = "very Impressive";
+            feedback = "very impressive";
         }
         else if(guessCount<=9){
             feedback ="good job";
@@ -78,9 +78,9 @@ function makeGuess() {
             feedback = "maybe try better next time '-'";
         }
         else{
-            feedback="to be honest, that is bad";
+            feedback="to be honest, that is bad :<";
         }
-        msg.textContent = "Good job " + capitalized + ", you are correct! It took " + guessCount + " tries, "+feedback;
+        msg.textContent = "Good job " + capitalized + ", you are correct! It took " + guessCount + " tries, "+ feedback;
         updateScore(guessCount);
         roundEndTime = new Date().getTime();
         let roundDuration = (roundEndTime - roundStartTime) / 1000;
