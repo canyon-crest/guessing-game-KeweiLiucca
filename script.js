@@ -66,29 +66,13 @@ function makeGuess() {
         return;
     }
     guessCount++;
-
     if (guess === answer) {
-        let feedback ="";
-        if (guessCount<=2){
-            feedback = "very Impressive";
-        }
-        else if(guessCount<=9){
-            feedback ="good job";
-        }
-        else if(guessCount<=15){
-            feedback = "maybe try better next time '-'";
-        }
-        else{
-            feedback="to be honest, that is bad";
-        }
-        msg.textContent = "Congradulations " + capitalized + ", you are correct! It took " + guessCount + " tries, "+feedback;
+        msg.textContent = "Good job " + capitalized + ", you are correct! It took " + guessCount + " tries.";
         updateScore(guessCount);
         roundEndTime = new Date().getTime();
         let roundDuration = (roundEndTime - roundStartTime) / 1000;
         updateTime(roundDuration);
-        celebrate();
         resetGame();
-        
     } else if (guess < answer) {
         msg.textContent = "No " + capitalized + " Too low, try again. " + hwc(guess);
     } else {
