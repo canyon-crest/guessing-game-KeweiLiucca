@@ -73,6 +73,7 @@ function makeGuess() {
         let roundDuration = (roundEndTime - roundStartTime) / 1000;
         updateTime(roundDuration);
         resetGame();
+        celebrate();
     } else if (guess < answer) {
         msg.textContent = "No " + capitalized + " Too low, try again. " + hwc(guess);
     } else {
